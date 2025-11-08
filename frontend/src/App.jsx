@@ -301,55 +301,52 @@ export default function LuckyPiggyBank() {
 
         {/* Main Card */}
         <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl shadow-2xl border-4 border-yellow-500 overflow-hidden">
-          {/* Header with coins and piggy bank logo */}
+          {/* Header with safe/vault logo */}
           <div className="relative bg-gradient-to-b from-slate-800 to-slate-900 p-6 pb-8">
-            <div className="absolute top-0 right-6 flex gap-1">
-              {[...Array(5)].map((_, i) => (
-                <div
-                  key={i}
-                  className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full border-2 border-yellow-300 flex items-center justify-center font-bold text-slate-900"
-                  style={{
-                    transform: `translateY(-${i * 8}px) rotate(${i * 10}deg)`,
-                    zIndex: 5 - i
-                  }}
-                >
-                  ₺
-                </div>
-              ))}
-            </div>
-
-            {/* Piggy Bank Logo */}
+            {/* Safe/Vault Logo */}
             <div className="flex items-center justify-center gap-3 mb-2">
               <div className="relative">
-                {/* Piggy Bank SVG */}
+                {/* Vault/Safe SVG */}
                 <svg 
                   width="64" 
                   height="64" 
                   viewBox="0 0 64 64" 
                   className="drop-shadow-lg"
                 >
-                  {/* Body */}
-                  <ellipse cx="32" cy="36" rx="22" ry="16" fill="#FCD34D" stroke="#F59E0B" strokeWidth="2"/>
-                  {/* Coin slot */}
-                  <rect x="28" y="22" width="8" height="3" rx="1" fill="#F59E0B"/>
-                  {/* Head */}
-                  <circle cx="48" cy="28" r="8" fill="#FCD34D" stroke="#F59E0B" strokeWidth="2"/>
-                  {/* Snout */}
-                  <ellipse cx="52" cy="28" rx="4" ry="3" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1.5"/>
-                  {/* Nostrils */}
-                  <circle cx="51" cy="27" r="1" fill="#F59E0B"/>
-                  <circle cx="51" cy="29" r="1" fill="#F59E0B"/>
-                  {/* Eye */}
-                  <circle cx="46" cy="26" r="1.5" fill="#1F2937"/>
-                  {/* Legs */}
-                  <rect x="20" y="48" width="4" height="8" rx="2" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1.5"/>
-                  <rect x="32" y="48" width="4" height="8" rx="2" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1.5"/>
-                  {/* Tail */}
-                  <path d="M 12 32 Q 8 28 10 24" stroke="#F59E0B" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-                  {/* Ear */}
-                  <ellipse cx="48" cy="22" rx="3" ry="4" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1.5"/>
+                  {/* Main vault body */}
+                  <rect x="8" y="12" width="48" height="40" rx="2" fill="#1E293B" stroke="#475569" strokeWidth="2"/>
+                  {/* Gold border */}
+                  <rect x="8" y="12" width="48" height="40" rx="2" fill="none" stroke="#F59E0B" strokeWidth="1.5"/>
+                  
+                  {/* Door */}
+                  <rect x="12" y="16" width="40" height="32" rx="1" fill="#334155" stroke="#F59E0B" strokeWidth="2"/>
+                  
+                  {/* Circular dial/lock in center */}
+                  <circle cx="32" cy="32" r="10" fill="#0F172A" stroke="#F59E0B" strokeWidth="2.5"/>
+                  <circle cx="32" cy="32" r="7" fill="#1E293B" stroke="#FCD34D" strokeWidth="1.5"/>
+                  
+                  {/* Dial marks */}
+                  <line x1="32" y1="25" x2="32" y2="28" stroke="#FCD34D" strokeWidth="2" strokeLinecap="round"/>
+                  <line x1="32" y1="36" x2="32" y2="39" stroke="#FCD34D" strokeWidth="2" strokeLinecap="round"/>
+                  <line x1="25" y1="32" x2="28" y2="32" stroke="#FCD34D" strokeWidth="2" strokeLinecap="round"/>
+                  <line x1="36" y1="32" x2="39" y2="32" stroke="#FCD34D" strokeWidth="2" strokeLinecap="round"/>
+                  
+                  {/* Handle/pointer on dial */}
+                  <line x1="32" y1="32" x2="32" y2="27" stroke="#FBBF24" strokeWidth="2.5" strokeLinecap="round"/>
+                  
+                  {/* Hinges */}
+                  <rect x="10" y="20" width="3" height="8" rx="1" fill="#F59E0B"/>
+                  <rect x="10" y="36" width="3" height="8" rx="1" fill="#F59E0B"/>
+                  
+                  {/* Handle */}
+                  <rect x="48" y="30" width="4" height="4" rx="1" fill="#F59E0B"/>
+                  <circle cx="50" cy="32" r="2" fill="#FCD34D"/>
+                  
                   {/* Shine effect */}
-                  <ellipse cx="28" cy="32" rx="4" ry="3" fill="white" opacity="0.3"/>
+                  <ellipse cx="20" cy="24" rx="6" ry="4" fill="white" opacity="0.15"/>
+                  
+                  {/* Lock indicator light */}
+                  <circle cx="32" cy="19" r="1.5" fill="#10B981"/>
                 </svg>
               </div>
               
