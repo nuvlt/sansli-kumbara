@@ -506,8 +506,9 @@ export default function LuckyPiggyBank() {
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    value={inputAmount}
+                    value={inputAmount || ''}
                     onChange={(e) => setInputAmount(Math.min(Math.max(0, parseFloat(e.target.value) || 0), userBalance))}
+                    placeholder="0.00"
                     className="bg-slate-900 text-yellow-400 text-2xl font-bold w-32 text-center rounded-lg py-2 border-2 border-slate-700 focus:border-yellow-500 outline-none"
                     step="0.01"
                     min="0"
