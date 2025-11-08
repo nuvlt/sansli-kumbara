@@ -11,7 +11,7 @@ export default function LuckyPiggyBank() {
   const [userBalance, setUserBalance] = useState(0);
   const [token, setToken] = useState(null);
   const [userName, setUserName] = useState('');
-  const [inputAmount, setInputAmount] = useState(0);
+  const [inputAmount, setInputAmount] = useState('');
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [myTickets, setMyTickets] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
@@ -120,7 +120,9 @@ export default function LuckyPiggyBank() {
 
   // API: Make Deposit
   const handleDeposit = async () => {
-    if (inputAmount <= 0 || inputAmount > userBalance) {
+    const amount = parseFloat(inputAmount) || 0;
+    
+    if (amount <= 0 || amount > userBalance) {
       setError('Geçersiz miktar!');
       return;
     }
@@ -132,7 +134,7 @@ export default function LuckyPiggyBank() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ amount: inputAmount })
+        body: JSON.stringify({ amount })
       });
 
       const data = await response.json();
@@ -144,7 +146,7 @@ export default function LuckyPiggyBank() {
       // Update UI
       setUserBalance(data.newBalance);
       setMyTickets(prev => prev + data.deposit.tickets);
-      setInputAmount(0);
+      setInputAmount('');
 
       // Reload game state
       await loadGameData(token);
@@ -195,7 +197,9 @@ export default function LuckyPiggyBank() {
   }, [token]);
 
   const quickAdd = (amount) => {
-    setInputAmount(prev => Math.min(prev + amount, userBalance));
+    const currentValue = parseFloat(inputAmount) || 0;
+    const newValue = Math.min(currentValue + amount, userBalance);
+    setInputAmount(newValue.toString());
   };
 
   const formatTime = (time) => String(time).padStart(2, '0');
@@ -297,7 +301,7 @@ export default function LuckyPiggyBank() {
 
         {/* Main Card */}
         <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl shadow-2xl border-4 border-yellow-500 overflow-hidden">
-          {/* Header with coins */}
+          {/* Header with coins and piggy bank logo */}
           <div className="relative bg-gradient-to-b from-slate-800 to-slate-900 p-6 pb-8">
             <div className="absolute top-0 right-6 flex gap-1">
               {[...Array(5)].map((_, i) => (
@@ -314,9 +318,45 @@ export default function LuckyPiggyBank() {
               ))}
             </div>
 
-            <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600 text-center mb-2">
-              ŞANSLI KUMBARA
-            </h1>
+            {/* Piggy Bank Logo */}
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <div className="relative">
+                {/* Piggy Bank SVG */}
+                <svg 
+                  width="64" 
+                  height="64" 
+                  viewBox="0 0 64 64" 
+                  className="drop-shadow-lg"
+                >
+                  {/* Body */}
+                  <ellipse cx="32" cy="36" rx="22" ry="16" fill="#FCD34D" stroke="#F59E0B" strokeWidth="2"/>
+                  {/* Coin slot */}
+                  <rect x="28" y="22" width="8" height="3" rx="1" fill="#F59E0B"/>
+                  {/* Head */}
+                  <circle cx="48" cy="28" r="8" fill="#FCD34D" stroke="#F59E0B" strokeWidth="2"/>
+                  {/* Snout */}
+                  <ellipse cx="52" cy="28" rx="4" ry="3" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1.5"/>
+                  {/* Nostrils */}
+                  <circle cx="51" cy="27" r="1" fill="#F59E0B"/>
+                  <circle cx="51" cy="29" r="1" fill="#F59E0B"/>
+                  {/* Eye */}
+                  <circle cx="46" cy="26" r="1.5" fill="#1F2937"/>
+                  {/* Legs */}
+                  <rect x="20" y="48" width="4" height="8" rx="2" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1.5"/>
+                  <rect x="32" y="48" width="4" height="8" rx="2" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1.5"/>
+                  {/* Tail */}
+                  <path d="M 12 32 Q 8 28 10 24" stroke="#F59E0B" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+                  {/* Ear */}
+                  <ellipse cx="48" cy="22" rx="3" ry="4" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1.5"/>
+                  {/* Shine effect */}
+                  <ellipse cx="28" cy="32" rx="4" ry="3" fill="white" opacity="0.3"/>
+                </svg>
+              </div>
+              
+              <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600">
+                ŞANSLI KUMBARA
+              </h1>
+            </div>
           </div>
 
           {/* Prize Pool */}
@@ -371,7 +411,7 @@ export default function LuckyPiggyBank() {
             <div className="bg-slate-800 rounded-xl p-4 border-2 border-slate-700">
               <div className="flex items-center justify-between mb-3">
                 <button
-                  onClick={() => setInputAmount(userBalance)}
+                  onClick={() => setInputAmount(userBalance.toString())}
                   className="bg-slate-900 hover:bg-slate-700 text-yellow-400 font-bold px-4 py-2 rounded-lg transition-colors"
                 >
                   Tümü
@@ -380,8 +420,21 @@ export default function LuckyPiggyBank() {
                   <input
                     type="number"
                     value={inputAmount}
-                    onChange={(e) => setInputAmount(Math.min(Math.max(0, parseFloat(e.target.value) || 0), userBalance))}
-                    className="bg-slate-900 text-yellow-400 text-2xl font-bold w-32 text-center rounded-lg py-2 border-2 border-slate-700 focus:border-yellow-500 outline-none"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Boş string'i izin ver
+                      if (value === '') {
+                        setInputAmount('');
+                        return;
+                      }
+                      // Sayısal değer kontrolü
+                      const numValue = parseFloat(value);
+                      if (!isNaN(numValue) && numValue >= 0) {
+                        setInputAmount(Math.min(numValue, userBalance).toString());
+                      }
+                    }}
+                    placeholder="0"
+                    className="bg-slate-900 text-yellow-400 text-2xl font-bold w-32 text-center rounded-lg py-2 border-2 border-slate-700 focus:border-yellow-500 outline-none placeholder-slate-700"
                     step="0.01"
                     min="0"
                     max={userBalance}
@@ -390,22 +443,30 @@ export default function LuckyPiggyBank() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <button
-                    onClick={() => setInputAmount(prev => Math.min(prev + 1, userBalance))}
+                    onClick={() => {
+                      const currentValue = parseFloat(inputAmount) || 0;
+                      const newValue = Math.min(currentValue + 1, userBalance);
+                      setInputAmount(newValue.toString());
+                    }}
                     className="bg-slate-900 hover:bg-slate-700 text-yellow-400 font-bold w-8 h-8 rounded flex items-center justify-center text-xl transition-colors"
                   >
                     +
                   </button>
                   <button
-                    onClick={() => setInputAmount(prev => Math.max(0, prev - 1))}
+                    onClick={() => {
+                      const currentValue = parseFloat(inputAmount) || 0;
+                      const newValue = Math.max(0, currentValue - 1);
+                      setInputAmount(newValue > 0 ? newValue.toString() : '');
+                    }}
                     className="bg-slate-900 hover:bg-slate-700 text-yellow-400 font-bold w-8 h-8 rounded flex items-center justify-center text-xl transition-colors"
                   >
                     -
                   </button>
                 </div>
               </div>
-              {inputAmount > 0 && (
+              {inputAmount && parseFloat(inputAmount) > 0 && (
                 <div className="text-yellow-400 text-sm text-center">
-                  ≈ {Math.floor(inputAmount * 100).toLocaleString('tr-TR')} Bilet
+                  ≈ {Math.floor(parseFloat(inputAmount) * 100).toLocaleString('tr-TR')} Bilet
                 </div>
               )}
             </div>
@@ -415,10 +476,10 @@ export default function LuckyPiggyBank() {
           <div className="px-4 mb-6">
             <button
               onClick={handleDeposit}
-              disabled={inputAmount <= 0 || inputAmount > userBalance}
+              disabled={!inputAmount || parseFloat(inputAmount) <= 0 || parseFloat(inputAmount) > userBalance}
               className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 disabled:from-slate-700 disabled:to-slate-700 text-slate-900 disabled:text-slate-500 font-black text-2xl py-4 rounded-2xl shadow-lg transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed"
             >
-              AT
+              SATIN AL
             </button>
           </div>
 
