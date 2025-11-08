@@ -546,7 +546,7 @@ export default function LuckyPiggyBank() {
               disabled={inputAmount <= 0 || inputAmount > userBalance}
               className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 disabled:from-slate-700 disabled:to-slate-700 text-slate-900 disabled:text-slate-500 font-black text-2xl py-4 rounded-2xl shadow-lg transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed"
             >
-              AT
+              BİLET AL
             </button>
           </div>
 
