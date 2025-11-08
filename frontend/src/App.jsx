@@ -1,17 +1,12 @@
-// App.jsx - API ile entegre frontend
 import React, { useState, useEffect } from 'react';
 import { Clock, Trophy, Coins, Users, TrendingUp, History, X } from 'lucide-react';
 
-// API Configuration
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const PLATFORM_API_KEY = import.meta.env.VITE_PLATFORM_API_KEY || 'YOUR_PLATFORM_API_KEY';
-
 export default function LuckyPiggyBank() {
   const [gameState, setGameState] = useState(null);
-  const [userBalance, setUserBalance] = useState(0);
-  const [token, setToken] = useState(null);
+  const [userBalance, setUserBalance] = useState(500);
+  const [userId, setUserId] = useState(null);
   const [userName, setUserName] = useState('');
-  const [inputAmount, setInputAmount] = useState('');
+  const [inputAmount, setInputAmount] = useState(0);
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [myTickets, setMyTickets] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
@@ -20,140 +15,97 @@ export default function LuckyPiggyBank() {
   const [showWinner, setShowWinner] = useState(false);
   const [winnerData, setWinnerData] = useState(null);
   const [showNameInput, setShowNameInput] = useState(true);
-  const [error, setError] = useState(null);
 
-  // Initialize
+  // Initialize or load game state
   useEffect(() => {
-    const savedToken = localStorage.getItem('luckypiggy_token');
-    const savedName = localStorage.getItem('luckypiggy_username');
-    
-    if (savedToken && savedName) {
-      setToken(savedToken);
-      setUserName(savedName);
-      setShowNameInput(false);
-      loadGameData(savedToken);
-    } else {
-      setLoading(false);
-    }
+    initializeGame();
   }, []);
 
-  // API: Login
-  const handleLogin = async () => {
-    if (!userName.trim()) {
-      setError('Lütfen isminizi girin');
-      return;
-    }
-
+  const initializeGame = async () => {
     try {
-      setLoading(true);
-      const userId = localStorage.getItem('luckypiggy_userid') || 
-                     'user_' + Math.random().toString(36).substr(2, 9);
-      
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': PLATFORM_API_KEY
-        },
-        body: JSON.stringify({
-          externalUserId: userId,
-          username: userName.trim(),
-          balance: 500 // Demo için başlangıç bakiyesi
-        })
-      });
+      // Generate or get user ID
+      let storedUserId = localStorage.getItem('luckypiggy_userid');
+      if (!storedUserId) {
+        storedUserId = 'user_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('luckypiggy_userid', storedUserId);
+      }
+      setUserId(storedUserId);
 
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Login başarısız');
+      // Get user name
+      const storedName = localStorage.getItem('luckypiggy_username');
+      if (storedName) {
+        setUserName(storedName);
+        setShowNameInput(false);
       }
 
-      localStorage.setItem('luckypiggy_token', data.token);
-      localStorage.setItem('luckypiggy_username', userName.trim());
-      localStorage.setItem('luckypiggy_userid', userId);
-
-      setToken(data.token);
-      setUserBalance(data.user.balance);
-      setShowNameInput(false);
+      // Load game state
+      const result = await window.storage.get('game_state', true);
       
-      await loadGameData(data.token);
+      if (!result) {
+        // Create new game
+        await createNewGame();
+      } else {
+        const state = JSON.parse(result.value);
+        setGameState(state);
+        
+        // Check if game ended
+        if (Date.now() >= state.endTime) {
+          await endGame(state);
+        }
+      }
+
+      // Load user tickets
+      await loadUserTickets(storedUserId);
+
+      // Load history
+      await loadHistory();
+
+      setLoading(false);
     } catch (error) {
-      console.error('Login error:', error);
-      setError('Giriş yapılamadı: ' + error.message);
-    } finally {
+      console.error('Initialize error:', error);
+      await createNewGame();
       setLoading(false);
     }
   };
 
-  // API: Load Game Data
-  const loadGameData = async (userToken) => {
+  const createNewGame = async () => {
+    const newGame = {
+      id: 'game_' + Date.now(),
+      startTime: Date.now(),
+      endTime: Date.now() + (3 * 24 * 60 * 60 * 1000), // 3 days
+      prizePool: 0,
+      nextGameReserve: 0,
+      totalTickets: 0,
+      participants: 0,
+      participantIds: []
+    };
+
+    await window.storage.set('game_state', JSON.stringify(newGame), true);
+    setGameState(newGame);
+  };
+
+  const loadUserTickets = async (uid) => {
     try {
-      const [gameResponse, historyResponse] = await Promise.all([
-        fetch(`${API_URL}/api/game/current`, {
-          headers: { 'Authorization': `Bearer ${userToken}` }
-        }),
-        fetch(`${API_URL}/api/game/history`, {
-          headers: { 'Authorization': `Bearer ${userToken}` }
-        })
-      ]);
-
-      const gameData = await gameResponse.json();
-      const historyData = await historyResponse.json();
-
-      if (gameData.success) {
-        setGameState(gameData.game);
-        setMyTickets(gameData.game.myTickets);
-        setUserBalance(gameData.userBalance);
+      if (!gameState) return;
+      const result = await window.storage.get(`tickets_${gameState.id}_${uid}`);
+      if (result) {
+        setMyTickets(parseInt(result.value));
+      } else {
+        setMyTickets(0);
       }
-
-      if (historyData.success) {
-        setHistory(historyData.history);
-      }
-
-      setLoading(false);
     } catch (error) {
-      console.error('Load game error:', error);
-      setError('Oyun verileri yüklenemedi');
-      setLoading(false);
+      setMyTickets(0);
     }
   };
 
-  // API: Make Deposit
-  const handleDeposit = async () => {
-    const amount = parseFloat(inputAmount) || 0;
-    
-    if (amount <= 0 || amount > userBalance) {
-      setError('Geçersiz miktar!');
-      return;
-    }
-
+  const loadHistory = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/game/deposit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ amount })
-      });
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'İşlem başarısız');
+      const result = await window.storage.get('game_history', true);
+      if (result) {
+        setHistory(JSON.parse(result.value));
       }
-
-      // Update UI
-      setUserBalance(data.newBalance);
-      setMyTickets(prev => prev + data.deposit.tickets);
-      setInputAmount('');
-
-      // Reload game state
-      await loadGameData(token);
-
     } catch (error) {
-      console.error('Deposit error:', error);
-      setError('Para yatırma başarısız: ' + error.message);
+      setHistory([]);
     }
   };
 
@@ -163,13 +115,11 @@ export default function LuckyPiggyBank() {
 
     const updateTimer = () => {
       const now = Date.now();
-      const endTime = new Date(gameState.endTime).getTime();
-      const diff = endTime - now;
+      const diff = gameState.endTime - now;
 
       if (diff <= 0) {
         setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
-        // Reload game (will get new game if ended)
-        if (token) loadGameData(token);
+        endGame(gameState);
         return;
       }
 
@@ -183,23 +133,142 @@ export default function LuckyPiggyBank() {
     updateTimer();
     const timer = setInterval(updateTimer, 1000);
     return () => clearInterval(timer);
-  }, [gameState, token]);
+  }, [gameState]);
 
-  // Auto refresh game state
-  useEffect(() => {
-    if (!token) return;
+  const endGame = async (state) => {
+    if (state.totalTickets === 0) {
+      // No participants, create new game
+      await createNewGame();
+      return;
+    }
 
-    const interval = setInterval(() => {
-      loadGameData(token);
-    }, 30000); // Refresh every 30 seconds
+    // Pick winner
+    const winningTicket = Math.floor(Math.random() * state.totalTickets);
+    let currentTicket = 0;
+    let winner = null;
 
-    return () => clearInterval(interval);
-  }, [token]);
+    for (const participantId of state.participantIds) {
+      try {
+        const ticketResult = await window.storage.get(`tickets_${state.id}_${participantId}`);
+        if (ticketResult) {
+          const tickets = parseInt(ticketResult.value);
+          if (winningTicket >= currentTicket && winningTicket < currentTicket + tickets) {
+            winner = participantId;
+            break;
+          }
+          currentTicket += tickets;
+        }
+      } catch (error) {
+        console.error('Error checking tickets:', error);
+      }
+    }
+
+    if (winner) {
+      // Get winner name
+      let winnerName = winner;
+      try {
+        const nameResult = await window.storage.get(`username_${winner}`, true);
+        if (nameResult) {
+          winnerName = JSON.parse(nameResult.value);
+        }
+      } catch (error) {
+        console.error('Error getting winner name:', error);
+      }
+
+      // Save to history
+      const historyEntry = {
+        gameId: state.id,
+        winner: winnerName,
+        winnerId: winner,
+        prize: state.prizePool,
+        totalTickets: state.totalTickets,
+        participants: state.participants,
+        endTime: Date.now()
+      };
+
+      const currentHistory = [...history, historyEntry].slice(-10);
+      await window.storage.set('game_history', JSON.stringify(currentHistory), true);
+      setHistory(currentHistory);
+
+      // Show winner
+      setWinnerData(historyEntry);
+      setShowWinner(true);
+
+      setTimeout(() => setShowWinner(false), 10000);
+    }
+
+    // Create new game with reserve
+    const newGame = {
+      id: 'game_' + Date.now(),
+      startTime: Date.now(),
+      endTime: Date.now() + (3 * 24 * 60 * 60 * 1000),
+      prizePool: state.nextGameReserve,
+      nextGameReserve: 0,
+      totalTickets: 0,
+      participants: 0,
+      participantIds: []
+    };
+
+    await window.storage.set('game_state', JSON.stringify(newGame), true);
+    setGameState(newGame);
+  };
+
+  const handleDeposit = async () => {
+    if (!userName.trim()) {
+      alert('Lütfen önce isminizi girin!');
+      return;
+    }
+
+    if (inputAmount <= 0 || inputAmount > userBalance) {
+      alert('Geçersiz miktar!');
+      return;
+    }
+
+    try {
+      // Calculate tickets and amounts
+      const tickets = Math.floor(inputAmount * 100);
+      const toPool = inputAmount * 0.60;
+      const toReserve = inputAmount * 0.05;
+
+      // Update user balance
+      setUserBalance(prev => prev - inputAmount);
+
+      // Update game state
+      const updatedState = {
+        ...gameState,
+        prizePool: gameState.prizePool + toPool,
+        nextGameReserve: gameState.nextGameReserve + toReserve,
+        totalTickets: gameState.totalTickets + tickets,
+        participants: gameState.participantIds.includes(userId) 
+          ? gameState.participants 
+          : gameState.participants + 1,
+        participantIds: gameState.participantIds.includes(userId)
+          ? gameState.participantIds
+          : [...gameState.participantIds, userId]
+      };
+
+      await window.storage.set('game_state', JSON.stringify(updatedState), true);
+      setGameState(updatedState);
+
+      // Update user tickets
+      const newTicketCount = myTickets + tickets;
+      await window.storage.set(`tickets_${gameState.id}_${userId}`, newTicketCount.toString());
+      setMyTickets(newTicketCount);
+
+      // Save username
+      if (userName) {
+        await window.storage.set(`username_${userId}`, JSON.stringify(userName), true);
+      }
+
+      setInputAmount(0);
+    } catch (error) {
+      console.error('Deposit error:', error);
+      alert('İşlem başarısız oldu. Lütfen tekrar deneyin.');
+    }
+  };
 
   const quickAdd = (amount) => {
-    const currentValue = parseFloat(inputAmount) || 0;
-    const newValue = Math.min(currentValue + amount, userBalance);
-    setInputAmount(newValue.toString());
+    setInputAmount(prev => Math.min(prev + amount, userBalance));
   };
 
   const formatTime = (time) => String(time).padStart(2, '0');
@@ -207,6 +276,13 @@ export default function LuckyPiggyBank() {
   const winChance = gameState && gameState.totalTickets > 0 && myTickets > 0
     ? ((myTickets / gameState.totalTickets) * 100).toFixed(2) 
     : 0;
+
+  const handleNameSubmit = () => {
+    if (userName.trim()) {
+      localStorage.setItem('luckypiggy_username', userName.trim());
+      setShowNameInput(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -222,38 +298,21 @@ export default function LuckyPiggyBank() {
         <div className="bg-slate-800 rounded-3xl shadow-2xl border-4 border-yellow-500 p-8 max-w-md w-full">
           <h2 className="text-3xl font-bold text-yellow-400 text-center mb-6">Hoş Geldiniz!</h2>
           <p className="text-slate-300 text-center mb-6">Oyuna başlamak için isminizi girin:</p>
-          
-          {error && (
-            <div className="bg-red-500/20 border border-red-500 rounded-lg p-3 mb-4">
-              <p className="text-red-300 text-sm text-center">{error}</p>
-            </div>
-          )}
-
           <input
             type="text"
             value={userName}
             onChange={(e) => setUserName(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+            onKeyPress={(e) => e.key === 'Enter' && handleNameSubmit()}
             placeholder="İsminiz"
             className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl border-2 border-slate-700 focus:border-yellow-500 outline-none mb-4"
             maxLength={20}
           />
           <button
-            onClick={handleLogin}
-            disabled={!userName.trim()}
-            className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 disabled:from-slate-700 disabled:to-slate-700 text-slate-900 disabled:text-slate-500 font-bold text-xl py-3 rounded-xl transition-all transform hover:scale-105 disabled:cursor-not-allowed"
+            onClick={handleNameSubmit}
+            className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-slate-900 font-bold text-xl py-3 rounded-xl transition-all transform hover:scale-105"
           >
             Başla
           </button>
-
-          <div className="mt-6 p-4 bg-blue-900/30 rounded-xl border border-blue-500/50">
-            <p className="text-blue-300 text-sm text-center">
-              🎮 Bu gerçek bir API ile çalışan demo'dur
-            </p>
-            <p className="text-blue-400 text-xs text-center mt-1">
-              Başlangıç bakiyeniz: ₺500
-            </p>
-          </div>
         </div>
       </div>
     );
@@ -262,19 +321,6 @@ export default function LuckyPiggyBank() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 flex items-center justify-center">
       <div className="w-full max-w-md">
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 bg-red-500/20 border border-red-500 rounded-2xl p-4">
-            <p className="text-red-300 text-center">{error}</p>
-            <button 
-              onClick={() => setError(null)}
-              className="text-red-400 text-sm mx-auto block mt-2 hover:text-red-300"
-            >
-              Kapat
-            </button>
-          </div>
-        )}
-
         {/* Winner Announcement */}
         {showWinner && winnerData && (
           <div className="mb-4 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-2xl p-4 animate-pulse shadow-2xl">
@@ -301,59 +347,89 @@ export default function LuckyPiggyBank() {
 
         {/* Main Card */}
         <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl shadow-2xl border-4 border-yellow-500 overflow-hidden">
-          {/* Header with safe/vault logo */}
-          <div className="relative bg-gradient-to-b from-slate-800 to-slate-900 p-6 pb-8">
-            {/* Safe/Vault Logo */}
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <div className="relative">
-                {/* Vault/Safe SVG */}
-                <svg 
-                  width="64" 
-                  height="64" 
-                  viewBox="0 0 64 64" 
-                  className="drop-shadow-lg"
+          {/* Header with animated piggy bank */}
+          <div className="relative bg-gradient-to-b from-slate-800 to-slate-900 p-6 pb-12 overflow-hidden">
+            {/* Falling coins animation */}
+            <div className="absolute inset-0 pointer-events-none">
+              {[...Array(8)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full border-2 border-yellow-300 flex items-center justify-center font-bold text-slate-900 text-sm animate-pulse"
+                  style={{
+                    left: `${15 + i * 10}%`,
+                    top: `-20px`,
+                    animation: `fall ${3 + i * 0.3}s ease-in infinite`,
+                    animationDelay: `${i * 0.5}s`,
+                    opacity: 0.8,
+                    transform: `rotate(${i * 45}deg)`
+                  }}
                 >
-                  {/* Main vault body */}
-                  <rect x="8" y="12" width="48" height="40" rx="2" fill="#1E293B" stroke="#475569" strokeWidth="2"/>
-                  {/* Gold border */}
-                  <rect x="8" y="12" width="48" height="40" rx="2" fill="none" stroke="#F59E0B" strokeWidth="1.5"/>
-                  
-                  {/* Door */}
-                  <rect x="12" y="16" width="40" height="32" rx="1" fill="#334155" stroke="#F59E0B" strokeWidth="2"/>
-                  
-                  {/* Circular dial/lock in center */}
-                  <circle cx="32" cy="32" r="10" fill="#0F172A" stroke="#F59E0B" strokeWidth="2.5"/>
-                  <circle cx="32" cy="32" r="7" fill="#1E293B" stroke="#FCD34D" strokeWidth="1.5"/>
-                  
-                  {/* Dial marks */}
-                  <line x1="32" y1="25" x2="32" y2="28" stroke="#FCD34D" strokeWidth="2" strokeLinecap="round"/>
-                  <line x1="32" y1="36" x2="32" y2="39" stroke="#FCD34D" strokeWidth="2" strokeLinecap="round"/>
-                  <line x1="25" y1="32" x2="28" y2="32" stroke="#FCD34D" strokeWidth="2" strokeLinecap="round"/>
-                  <line x1="36" y1="32" x2="39" y2="32" stroke="#FCD34D" strokeWidth="2" strokeLinecap="round"/>
-                  
-                  {/* Handle/pointer on dial */}
-                  <line x1="32" y1="32" x2="32" y2="27" stroke="#FBBF24" strokeWidth="2.5" strokeLinecap="round"/>
-                  
-                  {/* Hinges */}
-                  <rect x="10" y="20" width="3" height="8" rx="1" fill="#F59E0B"/>
-                  <rect x="10" y="36" width="3" height="8" rx="1" fill="#F59E0B"/>
-                  
-                  {/* Handle */}
-                  <rect x="48" y="30" width="4" height="4" rx="1" fill="#F59E0B"/>
-                  <circle cx="50" cy="32" r="2" fill="#FCD34D"/>
-                  
-                  {/* Shine effect */}
-                  <ellipse cx="20" cy="24" rx="6" ry="4" fill="white" opacity="0.15"/>
-                  
-                  {/* Lock indicator light */}
-                  <circle cx="32" cy="19" r="1.5" fill="#10B981"/>
-                </svg>
+                  ₺
+                </div>
+              ))}
+            </div>
+
+            {/* Piggy Bank Icon */}
+            <div className="relative z-10 mb-4">
+              <div className="w-32 h-32 mx-auto bg-gradient-to-br from-yellow-500 via-yellow-400 to-amber-500 rounded-full flex items-center justify-center shadow-2xl border-4 border-yellow-300 relative overflow-hidden">
+                {/* Coin slot */}
+                <div className="absolute top-8 w-16 h-2 bg-slate-900 rounded-full"></div>
+                
+                {/* Piggy face */}
+                <div className="relative">
+                  {/* Eyes */}
+                  <div className="flex gap-4 mb-2">
+                    <div className="w-3 h-3 bg-slate-900 rounded-full"></div>
+                    <div className="w-3 h-3 bg-slate-900 rounded-full"></div>
+                  </div>
+                  {/* Smile */}
+                  <div className="w-8 h-4 border-b-2 border-slate-900 rounded-full mx-auto"></div>
+                </div>
+
+                {/* Sparkle effect */}
+                <div className="absolute top-4 right-4 w-3 h-3 bg-white rounded-full animate-ping"></div>
+                <div className="absolute bottom-6 left-6 w-2 h-2 bg-white rounded-full animate-ping" style={{ animationDelay: '0.5s' }}></div>
               </div>
               
-              <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600">
-                ŞANSLI KUMBARA
-              </h1>
+              {/* Coin stack below piggy */}
+              <div className="flex justify-center gap-1 mt-3">
+                {[...Array(5)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full border-2 border-yellow-300 flex items-center justify-center font-bold text-slate-900"
+                    style={{
+                      transform: `translateY(${i * 2}px) rotate(${-10 + i * 5}deg)`,
+                      zIndex: 5 - i
+                    }}
+                  >
+                    ₺
+                  </div>
+                ))}
+              </div>
             </div>
+
+            <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600 text-center">
+              ŞANSLI KUMBARA
+            </h1>
+
+            <style>{`
+              @keyframes fall {
+                0% {
+                  transform: translateY(-20px) rotate(0deg);
+                  opacity: 0;
+                }
+                10% {
+                  opacity: 0.8;
+                }
+                90% {
+                  opacity: 0.8;
+                }
+                100% {
+                  transform: translateY(300px) rotate(360deg);
+                  opacity: 0;
+                }
+              }
+            `}</style>
           </div>
 
           {/* Prize Pool */}
@@ -395,8 +471,7 @@ export default function LuckyPiggyBank() {
               <button
                 key={amount}
                 onClick={() => quickAdd(amount)}
-                disabled={amount > userBalance}
-                className="bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 border-2 border-slate-700 hover:border-yellow-500 disabled:border-slate-800 rounded-xl py-3 text-yellow-400 disabled:text-slate-600 font-bold text-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed"
+                className="bg-slate-800 hover:bg-slate-700 border-2 border-slate-700 hover:border-yellow-500 rounded-xl py-3 text-yellow-400 font-bold text-xl transition-all transform hover:scale-105"
               >
                 {amount}₺
               </button>
@@ -408,7 +483,7 @@ export default function LuckyPiggyBank() {
             <div className="bg-slate-800 rounded-xl p-4 border-2 border-slate-700">
               <div className="flex items-center justify-between mb-3">
                 <button
-                  onClick={() => setInputAmount(userBalance.toString())}
+                  onClick={() => setInputAmount(userBalance)}
                   className="bg-slate-900 hover:bg-slate-700 text-yellow-400 font-bold px-4 py-2 rounded-lg transition-colors"
                 >
                   Tümü
@@ -417,21 +492,8 @@ export default function LuckyPiggyBank() {
                   <input
                     type="number"
                     value={inputAmount}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      // Boş string'i izin ver
-                      if (value === '') {
-                        setInputAmount('');
-                        return;
-                      }
-                      // Sayısal değer kontrolü
-                      const numValue = parseFloat(value);
-                      if (!isNaN(numValue) && numValue >= 0) {
-                        setInputAmount(Math.min(numValue, userBalance).toString());
-                      }
-                    }}
-                    placeholder="0"
-                    className="bg-slate-900 text-yellow-400 text-2xl font-bold w-32 text-center rounded-lg py-2 border-2 border-slate-700 focus:border-yellow-500 outline-none placeholder-slate-700"
+                    onChange={(e) => setInputAmount(Math.min(Math.max(0, parseFloat(e.target.value) || 0), userBalance))}
+                    className="bg-slate-900 text-yellow-400 text-2xl font-bold w-32 text-center rounded-lg py-2 border-2 border-slate-700 focus:border-yellow-500 outline-none"
                     step="0.01"
                     min="0"
                     max={userBalance}
@@ -440,30 +502,22 @@ export default function LuckyPiggyBank() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <button
-                    onClick={() => {
-                      const currentValue = parseFloat(inputAmount) || 0;
-                      const newValue = Math.min(currentValue + 1, userBalance);
-                      setInputAmount(newValue.toString());
-                    }}
+                    onClick={() => setInputAmount(prev => Math.min(prev + 1, userBalance))}
                     className="bg-slate-900 hover:bg-slate-700 text-yellow-400 font-bold w-8 h-8 rounded flex items-center justify-center text-xl transition-colors"
                   >
                     +
                   </button>
                   <button
-                    onClick={() => {
-                      const currentValue = parseFloat(inputAmount) || 0;
-                      const newValue = Math.max(0, currentValue - 1);
-                      setInputAmount(newValue > 0 ? newValue.toString() : '');
-                    }}
+                    onClick={() => setInputAmount(prev => Math.max(0, prev - 1))}
                     className="bg-slate-900 hover:bg-slate-700 text-yellow-400 font-bold w-8 h-8 rounded flex items-center justify-center text-xl transition-colors"
                   >
                     -
                   </button>
                 </div>
               </div>
-              {inputAmount && parseFloat(inputAmount) > 0 && (
+              {inputAmount > 0 && (
                 <div className="text-yellow-400 text-sm text-center">
-                  ≈ {Math.floor(parseFloat(inputAmount) * 100).toLocaleString('tr-TR')} Bilet
+                  ≈ {Math.floor(inputAmount * 100).toLocaleString('tr-TR')} Bilet
                 </div>
               )}
             </div>
@@ -473,10 +527,10 @@ export default function LuckyPiggyBank() {
           <div className="px-4 mb-6">
             <button
               onClick={handleDeposit}
-              disabled={!inputAmount || parseFloat(inputAmount) <= 0 || parseFloat(inputAmount) > userBalance}
+              disabled={inputAmount <= 0 || inputAmount > userBalance}
               className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 disabled:from-slate-700 disabled:to-slate-700 text-slate-900 disabled:text-slate-500 font-black text-2xl py-4 rounded-2xl shadow-lg transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed"
             >
-              SATIN AL
+              AT
             </button>
           </div>
 
@@ -518,13 +572,13 @@ export default function LuckyPiggyBank() {
           </ul>
         </div>
 
-        {/* API Status */}
-        <div className="mt-4 bg-green-900/30 border border-green-500/50 rounded-xl p-3 text-center">
-          <p className="text-green-300 text-sm font-semibold">
-            🔗 Backend API Bağlantılı
+        {/* Demo Notice */}
+        <div className="mt-4 bg-blue-900/30 border border-blue-500/50 rounded-xl p-3 text-center">
+          <p className="text-blue-300 text-sm font-semibold">
+            🎮 Bu tam işlevsel bir DEMO'dur
           </p>
-          <p className="text-green-400 text-xs mt-1">
-            Gerçek zamanlı veri senkronizasyonu aktif
+          <p className="text-blue-400 text-xs mt-1">
+            Veriler tüm kullanıcılar arasında paylaşılır
           </p>
         </div>
       </div>
@@ -547,7 +601,7 @@ export default function LuckyPiggyBank() {
                 <p className="text-slate-400 text-center py-8">Henüz kazanan yok</p>
               ) : (
                 <div className="space-y-3">
-                  {history.map((entry, idx) => (
+                  {[...history].reverse().map((entry, idx) => (
                     <div key={idx} className="bg-slate-900 rounded-xl p-4 border border-slate-700">
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center gap-2">
@@ -557,7 +611,7 @@ export default function LuckyPiggyBank() {
                         <span className="text-yellow-400 font-bold">₺{entry.prize.toFixed(2)}</span>
                       </div>
                       <div className="text-slate-400 text-sm">
-                        {entry.totalTickets.toLocaleString('tr-TR')} bilet
+                        {entry.participants} katılımcı • {entry.totalTickets.toLocaleString('tr-TR')} bilet
                       </div>
                       <div className="text-slate-500 text-xs mt-1">
                         {new Date(entry.endTime).toLocaleString('tr-TR')}
