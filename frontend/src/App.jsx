@@ -1,4 +1,25 @@
-// App.jsx - API ile entegre frontend (SES EFEKTLİ + YENİ LOGO)
+// Create audio elements
+  useEffect(() => {
+    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+  }, []);
+
+  // Background music player
+  const playBackgroundMusic = () => {
+    if (!musicEnabled || !audioContextRef.current) return;
+
+    const ctx = audioContextRef.current;
+    
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    
+    const melody = [
+      { freq: 523, duration: 0.3 },
+      { freq: 659, duration: 0.3 },
+      { freq: 784, duration: 0.3 },
+      { freq: 659, duration: 0.3 },
+      { freq: 523, duration: 0.3 },
+      { freq: 784,// App.jsx - API ile entegre frontend (SES EFEKTLİ + YENİ LOGO)
 import React, { useState, useEffect, useRef } from 'react';
 import { Clock, Trophy, Coins, Users, TrendingUp, History, X, Volume2, VolumeX } from 'lucide-react';
 
@@ -53,21 +74,22 @@ export default function LuckyPiggyBank() {
 
   // Create audio elements
   useEffect(() => {
+    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+
     // Coin drop sound
-    const coinAudioContext = new (window.AudioContext || window.webkitAudioContext)();
     coinSoundRef.current = () => {
       if (!soundEnabled) return;
       try {
-        const oscillator = coinAudioContext.createOscillator();
-        const gainNode = coinAudioContext.createGain();
+        const oscillator = audioContextRef.current.createOscillator();
+        const gainNode = audioContextRef.current.createGain();
         oscillator.connect(gainNode);
-        gainNode.connect(coinAudioContext.destination);
+        gainNode.connect(audioContextRef.current.destination);
         oscillator.frequency.value = 800;
         oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.3, coinAudioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, coinAudioContext.currentTime + 0.1);
-        oscillator.start(coinAudioContext.currentTime);
-        oscillator.stop(coinAudioContext.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.1);
+        oscillator.start(audioContextRef.current.currentTime);
+        oscillator.stop(audioContextRef.current.currentTime + 0.1);
       } catch (e) {
         console.log('Audio error:', e);
       }
@@ -77,26 +99,82 @@ export default function LuckyPiggyBank() {
     winSoundRef.current = () => {
       if (!soundEnabled) return;
       try {
-        const winAudioContext = new (window.AudioContext || window.webkitAudioContext)();
         [523, 659, 784, 1047].forEach((freq, i) => {
           setTimeout(() => {
-            const oscillator = winAudioContext.createOscillator();
-            const gainNode = winAudioContext.createGain();
+            const oscillator = audioContextRef.current.createOscillator();
+            const gainNode = audioContextRef.current.createGain();
             oscillator.connect(gainNode);
-            gainNode.connect(winAudioContext.destination);
+            gainNode.connect(audioContextRef.current.destination);
             oscillator.frequency.value = freq;
             oscillator.type = 'sine';
-            gainNode.gain.setValueAtTime(0.3, winAudioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, winAudioContext.currentTime + 0.3);
-            oscillator.start(winAudioContext.currentTime);
-            oscillator.stop(winAudioContext.currentTime + 0.3);
+            gainNode.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.3);
+            oscillator.start(audioContextRef.current.currentTime);
+            oscillator.stop(audioContextRef.current.currentTime + 0.3);
           }, i * 100);
         });
       } catch (e) {
         console.log('Audio error:', e);
       }
     };
-  }, [soundEnabled]);
+
+    // Background music
+    const playBackgroundMusic = () => {
+      if (!musicEnabled || !audioContextRef.current) return;
+
+      const ctx = audioContextRef.current;
+      
+      const melody = [
+        { freq: 523, duration: 0.3 }, // C
+        { freq: 659, duration: 0.3 }, // E
+        { freq: 784, duration: 0.3 }, // G
+        { freq: 659, duration: 0.3 }, // E
+        { freq: 523, duration: 0.3 }, // C
+        { freq: 784, duration: 0.3 }, // G
+        { freq: 1047, duration: 0.6 }, // C high
+        { freq: 784, duration: 0.3 }, // G
+        { freq: 659, duration: 0.3 }, // E
+        { freq: 523, duration: 0.6 }  // C
+      ];
+
+      let currentTime = ctx.currentTime;
+
+      melody.forEach((note) => {
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        oscillator.frequency.value = note.freq;
+        oscillator.type = 'triangle';
+        
+        gainNode.gain.setValueAtTime(0, currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.08, currentTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + note.duration);
+        
+        oscillator.start(currentTime);
+        oscillator.stop(currentTime + note.duration);
+        
+        currentTime += note.duration;
+      });
+
+      const totalDuration = melody.reduce((sum, note) => sum + note.duration, 0);
+      backgroundMusicRef.current = setTimeout(() => {
+        if (musicEnabled) playBackgroundMusic();
+      }, totalDuration * 1000);
+    };
+
+    if (musicEnabled) {
+      playBackgroundMusic();
+    }
+
+    return () => {
+      if (backgroundMusicRef.current) {
+        clearTimeout(backgroundMusicRef.current);
+      }
+    };
+  }, [soundEnabled, musicEnabled]);
 
   // Initialize
   useEffect(() => {
@@ -350,6 +428,15 @@ export default function LuckyPiggyBank() {
           title={soundEnabled ? 'Sesi Kapat' : 'Sesi Aç'}
         >
           {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+        </button>
+
+        {/* Music Toggle */}
+        <button
+          onClick={() => setMusicEnabled(!musicEnabled)}
+          className="fixed top-4 right-20 bg-slate-800 hover:bg-slate-700 p-3 rounded-full border border-slate-700 transition-colors z-50"
+          title={musicEnabled ? 'Müziği Kapat' : 'Müziği Aç'}
+        >
+          <span className="text-2xl">{musicEnabled ? '🎵' : '🔇'}</span>
         </button>
 
         {/* Error Message */}
