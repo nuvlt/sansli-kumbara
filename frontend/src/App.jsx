@@ -1,16 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+// frontend/src/App.jsx - COMPLETE VERSION
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Clock, Trophy, Coins, Users, TrendingUp, History, X, Volume2, VolumeX } from 'lucide-react';
 
 // API Configuration
-const getEnvVar = (key, defaultValue) => {
-  if (typeof window !== 'undefined' && window.ENV) {
-    return window.ENV[key] || defaultValue;
-  }
-  return defaultValue;
-};
-
-const API_URL = getEnvVar('VITE_API_URL', 'https://sansli-kumbara-api.onrender.com');
-const PLATFORM_API_KEY = getEnvVar('VITE_PLATFORM_API_KEY', 'YOUR_PLATFORM_API_KEY');
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const PLATFORM_API_KEY = import.meta.env.VITE_PLATFORM_API_KEY || 'YOUR_PLATFORM_API_KEY';
 
 export default function LuckyPiggyBank() {
   const [gameState, setGameState] = useState(null);
@@ -28,21 +22,31 @@ export default function LuckyPiggyBank() {
   const [showNameInput, setShowNameInput] = useState(true);
   const [error, setError] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [currentDay, setCurrentDay] = useState(2); // Demo için gün 2 aktif
-  const [claimedRewards, setClaimedRewards] = useState([1]); // Gün 1 alındı
+  const [musicEnabled, setMusicEnabled] = useState(false);
+  const [currentDay, setCurrentDay] = useState(2);
+  const [claimedRewards, setClaimedRewards] = useState([1]);
   const [showRewardClaimed, setShowRewardClaimed] = useState(false);
+  const [showPurchaseHistory, setShowPurchaseHistory] = useState(false);
+  const [purchaseHistory, setPurchaseHistory] = useState([
+    { id: 1, date: new Date(Date.now() - 86400000), amount: 50, tickets: 5000 },
+    { id: 2, date: new Date(Date.now() - 172800000), amount: 100, tickets: 10000 },
+    { id: 3, date: new Date(Date.now() - 259200000), amount: 25, tickets: 2500 }
+  ]);
+  const [showRewardsDropdown, setShowRewardsDropdown] = useState(false);
   
   // Audio refs
   const coinSoundRef = useRef(null);
   const winSoundRef = useRef(null);
+  const backgroundMusicRef = useRef(null);
+  const audioContextRef = useRef(null);
 
   // Rewards data
   const rewards = [
-    { day: 1, title: 'Hızlı Hoşgeldin', reward: '10₺ Bilet', icon: '🎁', description: 'İlk giriş hediyesi' },
-    { day: 2, title: 'Sadakat', reward: '20₺ Bilet + Sürpriz', icon: '⭐', description: '2. gün bonusu' },
-    { day: 3, title: 'Arkadaşını Davet Et', reward: '50₺ Bilet', icon: '👥', description: 'Davet et, kazan' },
-    { day: 4, title: 'En Az 250₺ Yatır', reward: 'Yatırdığının %10\'u', icon: '💰', description: 'Büyük bonus' },
-    { day: 5, title: '5. Günü Tamamla', reward: 'Çarkıfelek + 100₺', icon: '🎰', description: 'Büyük ödül' }
+    { day: 1, title: 'Hızlı Hoşgeldin', reward: '10₺ Bilet', icon: '🎁' },
+    { day: 2, title: 'Sadakat', reward: '20₺ Bilet + Sürpriz', icon: '⭐' },
+    { day: 3, title: 'Arkadaşını Davet Et', reward: '50₺ Bilet', icon: '👥' },
+    { day: 4, title: 'En Az 250₺ Yatır', reward: 'Yatırdığının %10\'u', icon: '💰' },
+    { day: 5, title: '5. Günü Tamamla', reward: 'Çarkıfelek + 100₺', icon: '🎰' }
   ];
 
   const handleClaimReward = (day) => {
@@ -57,76 +61,44 @@ export default function LuckyPiggyBank() {
     }
   };
 
-  // Create audio elements
+  // Create audio context
   useEffect(() => {
-    // Audio context for all sounds
-    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioContextRef.current = new AudioContext();
+      console.log('Audio context created:', audioContextRef.current.state);
+    } catch (e) {
+      console.error('Failed to create audio context:', e);
+    }
+  }, []);
 
-    // Coin drop sound
-    coinSoundRef.current = () => {
-      if (!soundEnabled) return;
+  // Background music player
+  const playBackgroundMusic = useCallback(() => {
+    if (!musicEnabled || !audioContextRef.current) return;
+
+    const ctx = audioContextRef.current;
+    
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(() => console.log('Audio resumed'));
+    }
+    
+    const melody = [
+      { freq: 523, duration: 0.3 },
+      { freq: 659, duration: 0.3 },
+      { freq: 784, duration: 0.3 },
+      { freq: 659, duration: 0.3 },
+      { freq: 523, duration: 0.3 },
+      { freq: 784, duration: 0.3 },
+      { freq: 1047, duration: 0.6 },
+      { freq: 784, duration: 0.3 },
+      { freq: 659, duration: 0.3 },
+      { freq: 523, duration: 0.6 }
+    ];
+
+    let currentTime = ctx.currentTime;
+
+    melody.forEach((note) => {
       try {
-        const oscillator = audioContextRef.current.createOscillator();
-        const gainNode = audioContextRef.current.createGain();
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContextRef.current.destination);
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.1);
-        oscillator.start(audioContextRef.current.currentTime);
-        oscillator.stop(audioContextRef.current.currentTime + 0.1);
-      } catch (e) {
-        console.log('Audio error:', e);
-      }
-    };
-
-    // Win sound
-    winSoundRef.current = () => {
-      if (!soundEnabled) return;
-      try {
-        [523, 659, 784, 1047].forEach((freq, i) => {
-          setTimeout(() => {
-            const oscillator = audioContextRef.current.createOscillator();
-            const gainNode = audioContextRef.current.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContextRef.current.destination);
-            oscillator.frequency.value = freq;
-            oscillator.type = 'sine';
-            gainNode.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.3);
-            oscillator.start(audioContextRef.current.currentTime);
-            oscillator.stop(audioContextRef.current.currentTime + 0.3);
-          }, i * 100);
-        });
-      } catch (e) {
-        console.log('Audio error:', e);
-      }
-    };
-
-    // Background music - Upbeat, casino-style melody
-    const playBackgroundMusic = () => {
-      if (!musicEnabled || !audioContextRef.current) return;
-
-      const ctx = audioContextRef.current;
-      
-      // Melody notes (C major pentatonic scale - happy, casino vibe)
-      const melody = [
-        { freq: 523, duration: 0.3 }, // C
-        { freq: 659, duration: 0.3 }, // E
-        { freq: 784, duration: 0.3 }, // G
-        { freq: 659, duration: 0.3 }, // E
-        { freq: 523, duration: 0.3 }, // C
-        { freq: 784, duration: 0.3 }, // G
-        { freq: 1047, duration: 0.6 }, // C high
-        { freq: 784, duration: 0.3 }, // G
-        { freq: 659, duration: 0.3 }, // E
-        { freq: 523, duration: 0.6 }  // C
-      ];
-
-      let currentTime = ctx.currentTime;
-
-      melody.forEach((note) => {
         const oscillator = ctx.createOscillator();
         const gainNode = ctx.createGain();
         
@@ -134,27 +106,36 @@ export default function LuckyPiggyBank() {
         gainNode.connect(ctx.destination);
         
         oscillator.frequency.value = note.freq;
-        oscillator.type = 'triangle'; // Softer sound
+        oscillator.type = 'triangle';
         
         gainNode.gain.setValueAtTime(0, currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.08, currentTime + 0.05); // Quiet background music
+        gainNode.gain.linearRampToValueAtTime(0.15, currentTime + 0.05);
         gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + note.duration);
         
         oscillator.start(currentTime);
         oscillator.stop(currentTime + note.duration);
         
         currentTime += note.duration;
-      });
+      } catch (e) {
+        console.error('Music note error:', e);
+      }
+    });
 
-      // Loop the music
-      const totalDuration = melody.reduce((sum, note) => sum + note.duration, 0);
-      backgroundMusicRef.current = setTimeout(() => {
-        if (musicEnabled) playBackgroundMusic();
-      }, totalDuration * 1000);
-    };
-
-    if (musicEnabled) {
+    const totalDuration = melody.reduce((sum, note) => sum + note.duration, 0);
+    backgroundMusicRef.current = setTimeout(() => {
       playBackgroundMusic();
+    }, totalDuration * 1000);
+  }, [musicEnabled]);
+
+  // Start/stop music
+  useEffect(() => {
+    if (musicEnabled && audioContextRef.current) {
+      console.log('Starting music...');
+      playBackgroundMusic();
+    } else {
+      if (backgroundMusicRef.current) {
+        clearTimeout(backgroundMusicRef.current);
+      }
     }
 
     return () => {
@@ -162,7 +143,56 @@ export default function LuckyPiggyBank() {
         clearTimeout(backgroundMusicRef.current);
       }
     };
-  }, [soundEnabled, musicEnabled]);
+  }, [musicEnabled, playBackgroundMusic]);
+
+  // Sound effects
+  useEffect(() => {
+    coinSoundRef.current = () => {
+      if (!soundEnabled || !audioContextRef.current) return;
+      try {
+        const ctx = audioContextRef.current;
+        if (ctx.state === 'suspended') ctx.resume();
+        
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.1);
+      } catch (e) {
+        console.log('Coin sound error:', e);
+      }
+    };
+
+    winSoundRef.current = () => {
+      if (!soundEnabled || !audioContextRef.current) return;
+      try {
+        const ctx = audioContextRef.current;
+        if (ctx.state === 'suspended') ctx.resume();
+        
+        [523, 659, 784, 1047].forEach((freq, i) => {
+          setTimeout(() => {
+            const oscillator = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            oscillator.frequency.value = freq;
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+            oscillator.start(ctx.currentTime);
+            oscillator.stop(ctx.currentTime + 0.3);
+          }, i * 100);
+        });
+      } catch (e) {
+        console.log('Win sound error:', e);
+      }
+    };
+  }, [soundEnabled]);
 
   // Initialize
   useEffect(() => {
@@ -251,7 +281,6 @@ export default function LuckyPiggyBank() {
       if (historyData.success) {
         setHistory(historyData.history);
         
-        // Check for new winner
         if (historyData.history.length > 0) {
           const latestWinner = historyData.history[0];
           const lastShownWinner = localStorage.getItem('last_shown_winner');
@@ -281,8 +310,15 @@ export default function LuckyPiggyBank() {
     }
 
     try {
-      // Play coin sound
       if (coinSoundRef.current) coinSoundRef.current();
+
+      const newPurchase = {
+        id: Date.now(),
+        date: new Date(),
+        amount: inputAmount,
+        tickets: Math.floor(inputAmount * 100)
+      };
+      setPurchaseHistory(prev => [newPurchase, ...prev]);
 
       const response = await fetch(`${API_URL}/api/game/deposit`, {
         method: 'POST',
@@ -338,14 +374,12 @@ export default function LuckyPiggyBank() {
     return () => clearInterval(timer);
   }, [gameState, token]);
 
-  // Auto refresh game state
+  // Auto refresh
   useEffect(() => {
     if (!token) return;
-
     const interval = setInterval(() => {
       loadGameData(token);
     }, 30000);
-
     return () => clearInterval(interval);
   }, [token]);
 
@@ -427,6 +461,15 @@ export default function LuckyPiggyBank() {
           <span className="text-2xl">{musicEnabled ? '🎵' : '🔇'}</span>
         </button>
 
+        {/* Purchase History Button */}
+        <button
+          onClick={() => setShowPurchaseHistory(true)}
+          className="fixed top-4 right-36 bg-slate-800 hover:bg-slate-700 text-yellow-400 p-3 rounded-full border border-slate-700 transition-colors z-50"
+          title="Satın Alma Geçmişi"
+        >
+          <History className="w-5 h-5" />
+        </button>
+
         {/* Error Message */}
         {error && (
           <div className="mb-4 bg-red-500/20 border border-red-500 rounded-2xl p-4">
@@ -464,18 +507,22 @@ export default function LuckyPiggyBank() {
           </div>
         </div>
 
-        {/* Daily Rewards - Compact Horizontal */}
-        <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded-2xl p-3 mb-4 border-2 border-purple-500/50 relative group">
+        {/* Daily Rewards */}
+        <div 
+          className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded-2xl p-3 mb-4 border-2 border-purple-500/50 relative"
+          onMouseEnter={() => setShowRewardsDropdown(true)}
+          onMouseLeave={() => setShowRewardsDropdown(false)}
+          onClick={() => setShowRewardsDropdown(!showRewardsDropdown)}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-2xl">🎁</span>
               <div>
                 <div className="text-purple-300 font-bold text-sm">Günlük Ödüller</div>
-                <div className="text-purple-400 text-xs">Gün {currentDay}/5 - Hover ile detay</div>
+                <div className="text-purple-400 text-xs">Gün {currentDay}/5 - Tıkla/Hover</div>
               </div>
             </div>
             
-            {/* Compact reward indicators */}
             <div className="flex gap-1">
               {rewards.map((item) => (
                 <div
@@ -495,73 +542,77 @@ export default function LuckyPiggyBank() {
             </div>
           </div>
 
-          {/* Hover Dropdown */}
-          <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 rounded-xl shadow-2xl border-2 border-purple-500/50 p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
-            <div className="space-y-2">
-              {rewards.map((item) => {
-                const isClaimed = claimedRewards.includes(item.day);
-                const isActive = item.day === currentDay;
-                const isLocked = item.day > currentDay;
+          {showRewardsDropdown && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 rounded-xl shadow-2xl border-2 border-purple-500/50 p-3 z-50">
+              <div className="space-y-2">
+                {rewards.map((item) => {
+                  const isClaimed = claimedRewards.includes(item.day);
+                  const isActive = item.day === currentDay;
+                  const isLocked = item.day > currentDay;
 
-                return (
-                  <button
-                    key={item.day}
-                    onClick={() => handleClaimReward(item.day)}
-                    disabled={!isActive || isClaimed}
-                    className={`w-full flex items-center gap-3 p-2 rounded-lg border-2 transition-all ${
-                      isClaimed
-                        ? 'bg-green-900/30 border-green-500/50 cursor-default'
-                        : isActive
-                        ? 'bg-purple-900/50 border-purple-500 hover:bg-purple-900/70 cursor-pointer'
-                        : 'bg-slate-900/50 border-slate-700 opacity-50 cursor-not-allowed'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${
-                      isClaimed
-                        ? 'bg-green-500 border-green-400 text-white'
-                        : isActive
-                        ? 'bg-purple-500 border-purple-400 text-white'
-                        : 'bg-slate-700 border-slate-600 text-slate-400'
-                    }`}>
-                      {isClaimed ? '✓' : item.day}
-                    </div>
-
-                    <div className="flex-1 text-left">
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">{item.icon}</span>
-                        <span className={`font-bold text-xs ${
-                          isClaimed ? 'text-green-300' : isActive ? 'text-purple-300' : 'text-slate-400'
-                        }`}>
-                          {item.title}
-                        </span>
-                      </div>
-                      <div className={`text-xs ${
-                        isClaimed ? 'text-green-400' : isActive ? 'text-purple-400' : 'text-slate-500'
+                  return (
+                    <button
+                      key={item.day}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleClaimReward(item.day);
+                      }}
+                      disabled={!isActive || isClaimed}
+                      className={`w-full flex items-center gap-3 p-2 rounded-lg border-2 transition-all ${
+                        isClaimed
+                          ? 'bg-green-900/30 border-green-500/50 cursor-default'
+                          : isActive
+                          ? 'bg-purple-900/50 border-purple-500 hover:bg-purple-900/70 cursor-pointer'
+                          : 'bg-slate-900/50 border-slate-700 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${
+                        isClaimed
+                          ? 'bg-green-500 border-green-400 text-white'
+                          : isActive
+                          ? 'bg-purple-500 border-purple-400 text-white'
+                          : 'bg-slate-700 border-slate-600 text-slate-400'
                       }`}>
-                        {item.reward}
+                        {isClaimed ? '✓' : item.day}
                       </div>
-                    </div>
 
-                    {isClaimed && (
-                      <span className="text-green-400 text-xs font-bold">Alındı</span>
-                    )}
-                    {isActive && !isClaimed && (
-                      <span className="text-purple-400 text-xs font-bold animate-pulse">Tıkla!</span>
-                    )}
-                    {isLocked && (
-                      <span className="text-slate-500 text-xs">🔒</span>
-                    )}
-                  </button>
-                );
-              })}
+                      <div className="flex-1 text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{item.icon}</span>
+                          <span className={`font-bold text-xs ${
+                            isClaimed ? 'text-green-300' : isActive ? 'text-purple-300' : 'text-slate-400'
+                          }`}>
+                            {item.title}
+                          </span>
+                        </div>
+                        <div className={`text-xs ${
+                          isClaimed ? 'text-green-400' : isActive ? 'text-purple-400' : 'text-slate-500'
+                        }`}>
+                          {item.reward}
+                        </div>
+                      </div>
+
+                      {isClaimed && (
+                        <span className="text-green-400 text-xs font-bold">Alındı</span>
+                      )}
+                      {isActive && !isClaimed && (
+                        <span className="text-purple-400 text-xs font-bold animate-pulse">Tıkla!</span>
+                      )}
+                      {isLocked && (
+                        <span className="text-slate-500 text-xs">🔒</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              <div className="mt-2 pt-2 border-t border-purple-500/30">
+                <p className="text-purple-300 text-xs text-center">
+                  💡 Aktif ödüle tıklayarak al!
+                </p>
+              </div>
             </div>
-            
-            <div className="mt-2 pt-2 border-t border-purple-500/30">
-              <p className="text-purple-300 text-xs text-center">
-                💡 Aktif ödüle tıklayarak al!
-              </p>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Reward Claimed Notification */}
@@ -577,9 +628,7 @@ export default function LuckyPiggyBank() {
 
         {/* Main Card */}
         <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl shadow-2xl border-4 border-yellow-500 overflow-hidden">
-          {/* Header with animated piggy bank */}
           <div className="relative bg-gradient-to-b from-slate-800 to-slate-900 p-6 pb-12 overflow-hidden">
-            {/* Falling coins animation */}
             <div className="absolute inset-0 pointer-events-none">
               {[...Array(8)].map((_, i) => (
                 <div
@@ -599,29 +648,22 @@ export default function LuckyPiggyBank() {
               ))}
             </div>
 
-            {/* Piggy Bank Icon */}
             <div className="relative z-10 mb-4">
               <div className="w-32 h-32 mx-auto bg-gradient-to-br from-yellow-500 via-yellow-400 to-amber-500 rounded-full flex items-center justify-center shadow-2xl border-4 border-yellow-300 relative overflow-hidden">
-                {/* Coin slot */}
                 <div className="absolute top-8 w-16 h-2 bg-slate-900 rounded-full"></div>
                 
-                {/* Piggy face */}
                 <div className="relative">
-                  {/* Eyes */}
                   <div className="flex gap-4 mb-2">
                     <div className="w-3 h-3 bg-slate-900 rounded-full"></div>
                     <div className="w-3 h-3 bg-slate-900 rounded-full"></div>
                   </div>
-                  {/* Smile */}
                   <div className="w-8 h-4 border-b-2 border-slate-900 rounded-full mx-auto"></div>
                 </div>
 
-                {/* Sparkle effect */}
                 <div className="absolute top-4 right-4 w-3 h-3 bg-white rounded-full animate-ping"></div>
                 <div className="absolute bottom-6 left-6 w-2 h-2 bg-white rounded-full animate-ping" style={{ animationDelay: '0.5s' }}></div>
               </div>
               
-              {/* Coin stack below piggy */}
               <div className="flex justify-center gap-1 mt-3">
                 {[...Array(5)].map((_, i) => (
                   <div
@@ -662,7 +704,6 @@ export default function LuckyPiggyBank() {
             `}</style>
           </div>
 
-          {/* Prize Pool */}
           <div className="bg-slate-900/50 mx-4 rounded-2xl border-4 border-yellow-500 p-6 mb-4 shadow-inner">
             <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-500 text-center mb-2 drop-shadow-lg">
               ₺{gameState?.prizePool.toFixed(2) || '0.00'}
@@ -670,7 +711,6 @@ export default function LuckyPiggyBank() {
             <div className="text-yellow-400 text-center text-sm font-semibold">ÖDÜL HAVUZU</div>
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-3 px-4 mb-4">
             <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700">
               <Users className="w-5 h-5 text-yellow-400 mx-auto mb-1" />
@@ -695,7 +735,6 @@ export default function LuckyPiggyBank() {
             </div>
           </div>
 
-          {/* Quick Amount Buttons */}
           <div className="grid grid-cols-3 gap-3 px-4 mb-4">
             {[20, 50, 100].map(amount => (
               <button
@@ -709,7 +748,6 @@ export default function LuckyPiggyBank() {
             ))}
           </div>
 
-          {/* Amount Input */}
           <div className="px-4 mb-4">
             <div className="bg-slate-800 rounded-xl p-4 border-2 border-slate-700">
               <div className="flex items-center justify-between mb-3">
@@ -755,7 +793,6 @@ export default function LuckyPiggyBank() {
             </div>
           </div>
 
-          {/* Deposit Button */}
           <div className="px-4 mb-6">
             <button
               onClick={handleDeposit}
@@ -766,7 +803,6 @@ export default function LuckyPiggyBank() {
             </button>
           </div>
 
-          {/* Countdown */}
           <div className="bg-slate-900/80 py-4 px-4 border-t-2 border-slate-700">
             <div className="flex items-center justify-center gap-3">
               <Clock className="w-6 h-6 text-yellow-400" />
@@ -780,7 +816,6 @@ export default function LuckyPiggyBank() {
           </div>
         </div>
 
-        {/* History Button */}
         <button
           onClick={() => setShowHistory(true)}
           className="mt-4 w-full bg-slate-800 hover:bg-slate-700 text-yellow-400 font-bold py-3 rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-colors"
@@ -789,7 +824,6 @@ export default function LuckyPiggyBank() {
           Geçmiş Kazananlar
         </button>
 
-        {/* Info Box */}
         <div className="mt-4 bg-slate-800/50 rounded-xl p-4 border border-slate-700">
           <h3 className="text-yellow-400 font-bold mb-2 flex items-center gap-2">
             <Trophy className="w-5 h-5" />
@@ -804,7 +838,6 @@ export default function LuckyPiggyBank() {
           </ul>
         </div>
 
-        {/* API Status */}
         <div className="mt-4 bg-green-900/30 border border-green-500/50 rounded-xl p-3 text-center">
           <p className="text-green-300 text-sm font-semibold">
             🔗 Backend API Bağlantılı
@@ -815,16 +848,12 @@ export default function LuckyPiggyBank() {
         </div>
       </div>
 
-      {/* History Modal */}
       {showHistory && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-slate-800 rounded-2xl max-w-md w-full max-h-[80vh] overflow-hidden border-2 border-yellow-500">
             <div className="bg-slate-900 p-4 flex justify-between items-center border-b border-slate-700">
               <h2 className="text-yellow-400 font-bold text-xl">Geçmiş Kazananlar</h2>
-              <button
-                onClick={() => setShowHistory(false)}
-                className="text-slate-400 hover:text-white"
-              >
+              <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-white">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -842,14 +871,61 @@ export default function LuckyPiggyBank() {
                         </div>
                         <span className="text-yellow-400 font-bold">₺{entry.prize.toFixed(2)}</span>
                       </div>
-                      <div className="text-slate-400 text-sm">
-                        {entry.totalTickets.toLocaleString('tr-TR')} bilet
-                      </div>
-                      <div className="text-slate-500 text-xs mt-1">
-                        {new Date(entry.endTime).toLocaleString('tr-TR')}
-                      </div>
+                      <div className="text-slate-400 text-sm">{entry.totalTickets.toLocaleString('tr-TR')} bilet</div>
+                      <div className="text-slate-500 text-xs mt-1">{new Date(entry.endTime).toLocaleString('tr-TR')}</div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPurchaseHistory && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 rounded-2xl max-w-md w-full max-h-[80vh] overflow-hidden border-2 border-yellow-500">
+            <div className="bg-slate-900 p-4 flex justify-between items-center border-b border-slate-700">
+              <h2 className="text-yellow-400 font-bold text-xl">Satın Alma Geçmişi</h2>
+              <button onClick={() => setShowPurchaseHistory(false)} className="text-slate-400 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {purchaseHistory.length === 0 ? (
+                <p className="text-slate-400 text-center py-8">Henüz satın alma yok</p>
+              ) : (
+                <div className="space-y-3">
+                  {purchaseHistory.map((purchase) => (
+                    <div key={purchase.id} className="bg-slate-900 rounded-xl p-4 border border-slate-700">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <div className="text-white font-bold text-lg">₺{purchase.amount.toFixed(2)}</div>
+                          <div className="text-yellow-400 text-sm">{purchase.tickets.toLocaleString('tr-TR')} Bilet</div>
+                        </div>
+                        <Coins className="w-6 h-6 text-yellow-400" />
+                      </div>
+                      <div className="text-slate-400 text-xs mt-2">📅 {purchase.date.toLocaleDateString('tr-TR')}</div>
+                      <div className="text-slate-500 text-xs">🕐 {purchase.date.toLocaleTimeString('tr-TR')}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {purchaseHistory.length > 0 && (
+                <div className="mt-4 p-3 bg-slate-900 rounded-lg border border-slate-700">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-400">Toplam Harcama:</span>
+                    <span className="text-yellow-400 font-bold">
+                      ₺{purchaseHistory.reduce((sum, p) => sum + p.amount, 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm mt-1">
+                    <span className="text-slate-400">Toplam Bilet:</span>
+                    <span className="text-yellow-400 font-bold">
+                      {purchaseHistory.reduce((sum, p) => sum + p.tickets, 0).toLocaleString('tr-TR')}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
