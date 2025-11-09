@@ -22,10 +22,20 @@ export default function LuckyPiggyBank() {
   const [showNameInput, setShowNameInput] = useState(true);
   const [error, setError] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [currentDay, setCurrentDay] = useState(1); // Demo için gün 1
   
   // Audio refs
   const coinSoundRef = useRef(null);
   const winSoundRef = useRef(null);
+
+  // Rewards data
+  const rewards = [
+    { day: 1, title: 'Hızlı Hoşgeldin', reward: '10₺ Bilet', icon: '🎁', completed: true },
+    { day: 2, title: 'Sadakat', reward: '20₺ Bilet + Sürpriz', icon: '⭐', completed: false },
+    { day: 3, title: 'Arkadaşını Davet Et', reward: '50₺ Bilet', icon: '👥', completed: false },
+    { day: 4, title: 'En Az 250₺ Yatır', reward: 'Yatırdığının %10\'u', icon: '💰', completed: false },
+    { day: 5, title: '5. Günü Tamamla', reward: 'Çarkıfelek + 100₺', icon: '🎰', completed: false }
+  ];
 
   // Create audio elements
   useEffect(() => {
@@ -572,6 +582,93 @@ export default function LuckyPiggyBank() {
           <History className="w-5 h-5" />
           Geçmiş Kazananlar
         </button>
+
+        {/* Rewards Progress */}
+        <div className="mt-4 bg-gradient-to-br from-purple-900/40 to-pink-900/40 rounded-2xl p-4 border-2 border-purple-500/50">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-purple-300 font-bold text-lg flex items-center gap-2">
+              🎁 Günlük Ödüller
+            </h3>
+            <div className="bg-purple-500/30 px-3 py-1 rounded-full border border-purple-400/50">
+              <span className="text-purple-200 text-sm font-bold">Gün {currentDay}/5</span>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="mb-4">
+            <div className="h-3 bg-slate-800 rounded-full overflow-hidden border border-purple-500/30">
+              <div 
+                className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500 relative"
+                style={{ width: `${(currentDay / 5) * 100}%` }}
+              >
+                <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Rewards List */}
+          <div className="space-y-2">
+            {rewards.map((item) => (
+              <div 
+                key={item.day}
+                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
+                  item.completed 
+                    ? 'bg-green-900/30 border-green-500/50' 
+                    : item.day === currentDay
+                    ? 'bg-purple-900/30 border-purple-500 animate-pulse'
+                    : 'bg-slate-800/50 border-slate-700 opacity-60'
+                }`}
+              >
+                {/* Day indicator */}
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl font-bold border-2 ${
+                  item.completed
+                    ? 'bg-green-500 border-green-400 text-white'
+                    : item.day === currentDay
+                    ? 'bg-purple-500 border-purple-400 text-white'
+                    : 'bg-slate-700 border-slate-600 text-slate-400'
+                }`}>
+                  {item.completed ? '✓' : item.day}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{item.icon}</span>
+                    <span className={`font-bold text-sm ${
+                      item.completed ? 'text-green-300' : item.day === currentDay ? 'text-purple-300' : 'text-slate-400'
+                    }`}>
+                      {item.title}
+                    </span>
+                  </div>
+                  <div className={`text-xs mt-0.5 ${
+                    item.completed ? 'text-green-400' : item.day === currentDay ? 'text-purple-400' : 'text-slate-500'
+                  }`}>
+                    {item.reward}
+                  </div>
+                </div>
+
+                {/* Status */}
+                {item.completed && (
+                  <div className="text-green-400 text-xs font-bold bg-green-500/20 px-2 py-1 rounded">
+                    Alındı
+                  </div>
+                )}
+                {item.day === currentDay && (
+                  <div className="text-purple-400 text-xs font-bold bg-purple-500/20 px-2 py-1 rounded animate-pulse">
+                    Aktif
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Info */}
+          <div className="mt-3 p-2 bg-purple-900/20 rounded-lg border border-purple-500/30">
+            <p className="text-purple-300 text-xs text-center">
+              💡 Her gün giriş yaparak ödülleri topla!
+            </p>
+          </div>
+        </div>
 
         {/* Info Box */}
         <div className="mt-4 bg-slate-800/50 rounded-xl p-4 border border-slate-700">
