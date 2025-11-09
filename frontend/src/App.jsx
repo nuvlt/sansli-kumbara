@@ -22,16 +22,11 @@ export default function LuckyPiggyBank() {
   const [showNameInput, setShowNameInput] = useState(true);
   const [error, setError] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [musicEnabled, setMusicEnabled] = useState(false);
   const [currentDay, setCurrentDay] = useState(2);
   const [claimedRewards, setClaimedRewards] = useState([1]);
   const [showRewardClaimed, setShowRewardClaimed] = useState(false);
   const [showPurchaseHistory, setShowPurchaseHistory] = useState(false);
-  const [purchaseHistory, setPurchaseHistory] = useState([
-    { id: 1, date: new Date(Date.now() - 86400000), amount: 50, tickets: 5000 },
-    { id: 2, date: new Date(Date.now() - 172800000), amount: 100, tickets: 10000 },
-    { id: 3, date: new Date(Date.now() - 259200000), amount: 25, tickets: 2500 }
-  ]);
+  const [purchaseHistory, setPurchaseHistory] = useState([]);
   const [showRewardsDropdown, setShowRewardsDropdown] = useState(false);
   
   // Audio refs
