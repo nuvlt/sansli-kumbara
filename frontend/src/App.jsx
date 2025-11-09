@@ -22,7 +22,9 @@ export default function LuckyPiggyBank() {
   const [showNameInput, setShowNameInput] = useState(true);
   const [error, setError] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [currentDay, setCurrentDay] = useState(1); // Demo için gün 1
+  const [currentDay, setCurrentDay] = useState(2); // Demo için gün 2 aktif
+  const [claimedRewards, setClaimedRewards] = useState([1]); // Gün 1 alındı
+  const [showRewardClaimed, setShowRewardClaimed] = useState(false);
   
   // Audio refs
   const coinSoundRef = useRef(null);
@@ -30,12 +32,24 @@ export default function LuckyPiggyBank() {
 
   // Rewards data
   const rewards = [
-    { day: 1, title: 'Hızlı Hoşgeldin', reward: '10₺ Bilet', icon: '🎁', completed: true },
-    { day: 2, title: 'Sadakat', reward: '20₺ Bilet + Sürpriz', icon: '⭐', completed: false },
-    { day: 3, title: 'Arkadaşını Davet Et', reward: '50₺ Bilet', icon: '👥', completed: false },
-    { day: 4, title: 'En Az 250₺ Yatır', reward: 'Yatırdığının %10\'u', icon: '💰', completed: false },
-    { day: 5, title: '5. Günü Tamamla', reward: 'Çarkıfelek + 100₺', icon: '🎰', completed: false }
+    { day: 1, title: 'Hızlı Hoşgeldin', reward: '10₺ Bilet', icon: '🎁', description: 'İlk giriş hediyesi' },
+    { day: 2, title: 'Sadakat', reward: '20₺ Bilet + Sürpriz', icon: '⭐', description: '2. gün bonusu' },
+    { day: 3, title: 'Arkadaşını Davet Et', reward: '50₺ Bilet', icon: '👥', description: 'Davet et, kazan' },
+    { day: 4, title: 'En Az 250₺ Yatır', reward: 'Yatırdığının %10\'u', icon: '💰', description: 'Büyük bonus' },
+    { day: 5, title: '5. Günü Tamamla', reward: 'Çarkıfelek + 100₺', icon: '🎰', description: 'Büyük ödül' }
   ];
+
+  const handleClaimReward = (day) => {
+    if (day === currentDay && !claimedRewards.includes(day)) {
+      setClaimedRewards([...claimedRewards, day]);
+      setShowRewardClaimed(true);
+      if (coinSoundRef.current) coinSoundRef.current();
+      setTimeout(() => {
+        setShowRewardClaimed(false);
+        setCurrentDay(day + 1);
+      }, 2000);
+    }
+  };
 
   // Create audio elements
   useEffect(() => {
@@ -375,6 +389,117 @@ export default function LuckyPiggyBank() {
           </div>
         </div>
 
+        {/* Daily Rewards - Compact Horizontal */}
+        <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded-2xl p-3 mb-4 border-2 border-purple-500/50 relative group">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🎁</span>
+              <div>
+                <div className="text-purple-300 font-bold text-sm">Günlük Ödüller</div>
+                <div className="text-purple-400 text-xs">Gün {currentDay}/5 - Hover ile detay</div>
+              </div>
+            </div>
+            
+            {/* Compact reward indicators */}
+            <div className="flex gap-1">
+              {rewards.map((item) => (
+                <div
+                  key={item.day}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-lg border-2 transition-all cursor-pointer ${
+                    claimedRewards.includes(item.day)
+                      ? 'bg-green-500 border-green-400 scale-100'
+                      : item.day === currentDay
+                      ? 'bg-purple-500 border-purple-400 animate-pulse scale-110'
+                      : 'bg-slate-700 border-slate-600 opacity-50 scale-90'
+                  }`}
+                  title={item.title}
+                >
+                  {claimedRewards.includes(item.day) ? '✓' : item.icon}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Hover Dropdown */}
+          <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 rounded-xl shadow-2xl border-2 border-purple-500/50 p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+            <div className="space-y-2">
+              {rewards.map((item) => {
+                const isClaimed = claimedRewards.includes(item.day);
+                const isActive = item.day === currentDay;
+                const isLocked = item.day > currentDay;
+
+                return (
+                  <button
+                    key={item.day}
+                    onClick={() => handleClaimReward(item.day)}
+                    disabled={!isActive || isClaimed}
+                    className={`w-full flex items-center gap-3 p-2 rounded-lg border-2 transition-all ${
+                      isClaimed
+                        ? 'bg-green-900/30 border-green-500/50 cursor-default'
+                        : isActive
+                        ? 'bg-purple-900/50 border-purple-500 hover:bg-purple-900/70 cursor-pointer'
+                        : 'bg-slate-900/50 border-slate-700 opacity-50 cursor-not-allowed'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${
+                      isClaimed
+                        ? 'bg-green-500 border-green-400 text-white'
+                        : isActive
+                        ? 'bg-purple-500 border-purple-400 text-white'
+                        : 'bg-slate-700 border-slate-600 text-slate-400'
+                    }`}>
+                      {isClaimed ? '✓' : item.day}
+                    </div>
+
+                    <div className="flex-1 text-left">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">{item.icon}</span>
+                        <span className={`font-bold text-xs ${
+                          isClaimed ? 'text-green-300' : isActive ? 'text-purple-300' : 'text-slate-400'
+                        }`}>
+                          {item.title}
+                        </span>
+                      </div>
+                      <div className={`text-xs ${
+                        isClaimed ? 'text-green-400' : isActive ? 'text-purple-400' : 'text-slate-500'
+                      }`}>
+                        {item.reward}
+                      </div>
+                    </div>
+
+                    {isClaimed && (
+                      <span className="text-green-400 text-xs font-bold">Alındı</span>
+                    )}
+                    {isActive && !isClaimed && (
+                      <span className="text-purple-400 text-xs font-bold animate-pulse">Tıkla!</span>
+                    )}
+                    {isLocked && (
+                      <span className="text-slate-500 text-xs">🔒</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className="mt-2 pt-2 border-t border-purple-500/30">
+              <p className="text-purple-300 text-xs text-center">
+                💡 Aktif ödüle tıklayarak al!
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Reward Claimed Notification */}
+        {showRewardClaimed && (
+          <div className="mb-4 bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl p-4 animate-bounce shadow-2xl">
+            <div className="text-white text-center">
+              <div className="text-3xl mb-2">🎉</div>
+              <div className="text-xl font-black">Ödül Alındı!</div>
+              <div className="text-sm mt-1">+{rewards[currentDay - 1]?.reward}</div>
+            </div>
+          </div>
+        )}
+
         {/* Main Card */}
         <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl shadow-2xl border-4 border-yellow-500 overflow-hidden">
           {/* Header with animated piggy bank */}
@@ -582,93 +707,6 @@ export default function LuckyPiggyBank() {
           <History className="w-5 h-5" />
           Geçmiş Kazananlar
         </button>
-
-        {/* Rewards Progress */}
-        <div className="mt-4 bg-gradient-to-br from-purple-900/40 to-pink-900/40 rounded-2xl p-4 border-2 border-purple-500/50">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-purple-300 font-bold text-lg flex items-center gap-2">
-              🎁 Günlük Ödüller
-            </h3>
-            <div className="bg-purple-500/30 px-3 py-1 rounded-full border border-purple-400/50">
-              <span className="text-purple-200 text-sm font-bold">Gün {currentDay}/5</span>
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="mb-4">
-            <div className="h-3 bg-slate-800 rounded-full overflow-hidden border border-purple-500/30">
-              <div 
-                className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500 relative"
-                style={{ width: `${(currentDay / 5) * 100}%` }}
-              >
-                <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-              </div>
-            </div>
-          </div>
-
-          {/* Rewards List */}
-          <div className="space-y-2">
-            {rewards.map((item) => (
-              <div 
-                key={item.day}
-                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
-                  item.completed 
-                    ? 'bg-green-900/30 border-green-500/50' 
-                    : item.day === currentDay
-                    ? 'bg-purple-900/30 border-purple-500 animate-pulse'
-                    : 'bg-slate-800/50 border-slate-700 opacity-60'
-                }`}
-              >
-                {/* Day indicator */}
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl font-bold border-2 ${
-                  item.completed
-                    ? 'bg-green-500 border-green-400 text-white'
-                    : item.day === currentDay
-                    ? 'bg-purple-500 border-purple-400 text-white'
-                    : 'bg-slate-700 border-slate-600 text-slate-400'
-                }`}>
-                  {item.completed ? '✓' : item.day}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{item.icon}</span>
-                    <span className={`font-bold text-sm ${
-                      item.completed ? 'text-green-300' : item.day === currentDay ? 'text-purple-300' : 'text-slate-400'
-                    }`}>
-                      {item.title}
-                    </span>
-                  </div>
-                  <div className={`text-xs mt-0.5 ${
-                    item.completed ? 'text-green-400' : item.day === currentDay ? 'text-purple-400' : 'text-slate-500'
-                  }`}>
-                    {item.reward}
-                  </div>
-                </div>
-
-                {/* Status */}
-                {item.completed && (
-                  <div className="text-green-400 text-xs font-bold bg-green-500/20 px-2 py-1 rounded">
-                    Alındı
-                  </div>
-                )}
-                {item.day === currentDay && (
-                  <div className="text-purple-400 text-xs font-bold bg-purple-500/20 px-2 py-1 rounded animate-pulse">
-                    Aktif
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Info */}
-          <div className="mt-3 p-2 bg-purple-900/20 rounded-lg border border-purple-500/30">
-            <p className="text-purple-300 text-xs text-center">
-              💡 Her gün giriş yaparak ödülleri topla!
-            </p>
-          </div>
-        </div>
 
         {/* Info Box */}
         <div className="mt-4 bg-slate-800/50 rounded-xl p-4 border border-slate-700">
