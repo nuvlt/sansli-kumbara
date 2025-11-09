@@ -1,31 +1,16 @@
-// Create audio elements
-  useEffect(() => {
-    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-  }, []);
-
-  // Background music player
-  const playBackgroundMusic = () => {
-    if (!musicEnabled || !audioContextRef.current) return;
-
-    const ctx = audioContextRef.current;
-    
-    if (ctx.state === 'suspended') {
-      ctx.resume();
-    }
-    
-    const melody = [
-      { freq: 523, duration: 0.3 },
-      { freq: 659, duration: 0.3 },
-      { freq: 784, duration: 0.3 },
-      { freq: 659, duration: 0.3 },
-      { freq: 523, duration: 0.3 },
-      { freq: 784,// App.jsx - API ile entegre frontend (SES EFEKTLİ + YENİ LOGO)
 import React, { useState, useEffect, useRef } from 'react';
 import { Clock, Trophy, Coins, Users, TrendingUp, History, X, Volume2, VolumeX } from 'lucide-react';
 
 // API Configuration
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const PLATFORM_API_KEY = import.meta.env.VITE_PLATFORM_API_KEY || 'YOUR_PLATFORM_API_KEY';
+const getEnvVar = (key, defaultValue) => {
+  if (typeof window !== 'undefined' && window.ENV) {
+    return window.ENV[key] || defaultValue;
+  }
+  return defaultValue;
+};
+
+const API_URL = getEnvVar('VITE_API_URL', 'https://sansli-kumbara-api.onrender.com');
+const PLATFORM_API_KEY = getEnvVar('VITE_PLATFORM_API_KEY', 'YOUR_PLATFORM_API_KEY');
 
 export default function LuckyPiggyBank() {
   const [gameState, setGameState] = useState(null);
@@ -74,6 +59,7 @@ export default function LuckyPiggyBank() {
 
   // Create audio elements
   useEffect(() => {
+    // Audio context for all sounds
     audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
 
     // Coin drop sound
@@ -118,12 +104,13 @@ export default function LuckyPiggyBank() {
       }
     };
 
-    // Background music
+    // Background music - Upbeat, casino-style melody
     const playBackgroundMusic = () => {
       if (!musicEnabled || !audioContextRef.current) return;
 
       const ctx = audioContextRef.current;
       
+      // Melody notes (C major pentatonic scale - happy, casino vibe)
       const melody = [
         { freq: 523, duration: 0.3 }, // C
         { freq: 659, duration: 0.3 }, // E
@@ -147,10 +134,10 @@ export default function LuckyPiggyBank() {
         gainNode.connect(ctx.destination);
         
         oscillator.frequency.value = note.freq;
-        oscillator.type = 'triangle';
+        oscillator.type = 'triangle'; // Softer sound
         
         gainNode.gain.setValueAtTime(0, currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.08, currentTime + 0.05);
+        gainNode.gain.linearRampToValueAtTime(0.08, currentTime + 0.05); // Quiet background music
         gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + note.duration);
         
         oscillator.start(currentTime);
@@ -159,6 +146,7 @@ export default function LuckyPiggyBank() {
         currentTime += note.duration;
       });
 
+      // Loop the music
       const totalDuration = melody.reduce((sum, note) => sum + note.duration, 0);
       backgroundMusicRef.current = setTimeout(() => {
         if (musicEnabled) playBackgroundMusic();
@@ -614,20 +602,26 @@ export default function LuckyPiggyBank() {
             {/* Piggy Bank Icon */}
             <div className="relative z-10 mb-4">
               <div className="w-32 h-32 mx-auto bg-gradient-to-br from-yellow-500 via-yellow-400 to-amber-500 rounded-full flex items-center justify-center shadow-2xl border-4 border-yellow-300 relative overflow-hidden">
+                {/* Coin slot */}
                 <div className="absolute top-8 w-16 h-2 bg-slate-900 rounded-full"></div>
                 
+                {/* Piggy face */}
                 <div className="relative">
+                  {/* Eyes */}
                   <div className="flex gap-4 mb-2">
                     <div className="w-3 h-3 bg-slate-900 rounded-full"></div>
                     <div className="w-3 h-3 bg-slate-900 rounded-full"></div>
                   </div>
+                  {/* Smile */}
                   <div className="w-8 h-4 border-b-2 border-slate-900 rounded-full mx-auto"></div>
                 </div>
 
+                {/* Sparkle effect */}
                 <div className="absolute top-4 right-4 w-3 h-3 bg-white rounded-full animate-ping"></div>
                 <div className="absolute bottom-6 left-6 w-2 h-2 bg-white rounded-full animate-ping" style={{ animationDelay: '0.5s' }}></div>
               </div>
               
+              {/* Coin stack below piggy */}
               <div className="flex justify-center gap-1 mt-3">
                 {[...Array(5)].map((_, i) => (
                   <div
